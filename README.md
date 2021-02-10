@@ -10,7 +10,7 @@ suid: 610380697
 
 email: kegan01@syr.edu
 
-Directory
+Directory of Branches
 
 Documents: 
 
@@ -26,3 +26,10 @@ Data_Visualization_OSHA_Amputations
 
 Topic_Prediction_Vaccine_Stance_NLP
 
+Project Codes:
+
+Predicting_No_Shows_at_Doctors_Office
+
+Data_Visualization_OSHA_Amputations
+
+Topic_Prediction_Vaccine_Stance_NLP
