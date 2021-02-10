@@ -1,0 +1,317 @@
+---
+title: "IST 707 Final Project: Predicting No-Shows"
+author: "Kathryn Egan"
+date: "5/27/2020"
+output: word_document
+---
+
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+library(scales)
+library(plyr)
+library(dplyr)
+library(arules)
+library(arulesViz)
+library(factoextra)
+
+df<-read.csv("C:/Users/katva/Desktop/no_show.csv",
+                   stringsAsFactors = TRUE, 
+                   header = TRUE, 
+                   na.strings = c("", " ", "NA"))
+```
+
+
+```{r}
+str(df)
+colnames(df)
+```
+ID number will throw the rules off, as everyone has a unique ID number, so the ID numbers will be removed from the dataset
+```{r}
+dfNS<-df[,-1]
+colnames(dfNS)
+dfNS<-dfNS[,-1]
+```
+Discretization of the data and converting numeric data to nominal data
+
+```{r}
+dfNS$Age<- cut(dfNS$Age, breaks = c(0,10,20,30,40,50,60,Inf), labels = c("child","teen","twenties","thirties","forties","fifties","seniors"))
+
+
+dfNS$Scholarship<- ifelse(dfNS$Scholarship == 0, "No", "Yes")
+dfNS$Hipertension<-ifelse(dfNS$Hipertension == 0, "No", "Yes")
+dfNS$Diabetes<-ifelse(dfNS$Diabetes == 0, "No", "Yes")
+dfNS$Alcoholism<-ifelse(dfNS$Alcoholism == 0, "No", "Yes")
+dfNS$Handcap<-ifelse(dfNS$Handcap == 0, "No", "Yes")
+dfNS$SMS_received<-ifelse(dfNS$SMS_received == 0, "No", "Yes")
+```
+
+Creating new column to calculate days between scheduling an appointment and the actual appointment date
+```{r}
+dfNS$ScheduledDay<-as.Date(dfNS$ScheduledDay)
+dfNS$AppointmentDay<-as.Date(dfNS$AppointmentDay)
+dfNS$Total_Days<- difftime(dfNS$AppointmentDay,dfNS$ScheduledDay, units = "days")
+
+dfNS$Total_Days<- as.numeric(dfNS$Total_Days)
+dfNS$Total_Days<- cut(dfNS$Total_Days, breaks = c(0,7,14,21,30,60,90,Inf), labels = c("within_the_week","the_next_week","two_weeks_out","three_weeks_out","one_month","two_months","three_months_or_longer"))
+
+
+```
+Now that we have days between appointment and scheduling, I need to remove the date columns
+
+```{r}
+dfNS<-(dfNS[,-2:-3])
+str(dfNS)
+
+```
+Change characters to factors
+
+```{r}
+dfNS$Scholarship<- as.factor(dfNS$Scholarship)
+dfNS$Hipertension<-as.factor(dfNS$Hipertension)
+dfNS$Diabetes<-as.factor(dfNS$Diabetes)
+dfNS$Alcoholism<- as.factor(dfNS$Alcoholism)
+dfNS$Handcap<- as.factor(dfNS$Handcap)
+dfNS$SMS_received<- as.factor(dfNS$SMS_received)
+                         
+```
+
+
+
+0 has been replaced by NA in the Total_Days col. I need to change it to "same_day" and correct levels.
+
+```{r}
+library(forcats) 
+dfNS$Total_Days<- fct_explicit_na(dfNS$Total_Days, na_level = "Same_Day")
+```
+
+Now looking for frequent variables in the data
+```{r}
+frequentVariables <- eclat (dfNS, parameter = list(supp = 0.7, minlen = 2)) 
+inspect(frequentVariables)
+```
+
+```{r}
+frequentVariables <- eclat (dfNS, parameter = list(supp = 0.8, minlen = 2)) 
+inspect(frequentVariables)
+```
+
+```{r}
+noShow_rules<-apriori(dfNS, parameter = list(supp=0.8, conf=0.5, maxlen = 12 ))
+inspect(noShow_rules)
+```
+
+```{r}
+rules_by_confidence<- sort(noShow_rules, by="confidence", decreasing = TRUE)
+inspect(head(rules_by_confidence,10))
+```
+
+
+```{r}
+noShow_rules<-apriori (data=dfNS, parameter=list (supp=0.01,conf = 0.5), appearance = list(default="lhs", rhs="No.show=Yes" ), control = list (verbose=FALSE))
+inspect(sort(noShow_rules, by="lift", decreasing = TRUE))
+```
+
+
+```{r}
+dfNS_Yes<- dfNS %>% filter(No.show == "Yes")
+str(dfNS_Yes)
+```
+
+```{r}
+frequentVariables <- eclat (dfNS_Yes, parameter = list(supp = 0.7, minlen = 2)) 
+inspect(frequentVariables)
+```
+
+
+```{r}
+noShow_rules<-apriori (data=dfNS_Yes, parameter=list (supp=0.01,conf = 0.5, minlen=3), appearance = list(default="lhs", rhs="No.show=Yes" ), control = list (verbose=FALSE))
+inspect(head(sort(noShow_rules, by="lift", decreasing = TRUE)))
+```
+
+I want to look at it without neighborhood
+```{r}
+dfNS_Yes2<-(dfNS_Yes[,-3])
+```
+
+
+```{r}
+noShow_rules<-apriori (data=dfNS_Yes2, parameter=list (supp=0.01,conf = 0.5, minlen=3), appearance = list(default="lhs", rhs="No.show=Yes" ), control = list (verbose=FALSE))
+inspect(head(sort(noShow_rules, by="lift", decreasing = TRUE)))
+```
+
+```{r}
+age_counts <- table(dfNS_Yes2$Age)
+barplot(age_counts, main="No Shows by Age",xlab="age group", col = "green")
+```
+
+```{r}
+gender_counts<- table(dfNS_Yes2$Gender)
+barplot(gender_counts, main="no show by gender", xlab = "gender", col = "purple")
+```
+
+```{r}
+totGen<- table(dfNS$Gender)
+barplot(totGen, main= "total gender counts", xlab = "gender", col = "purple")
+```
+
+
+
+```{r}
+totAge<- table(dfNS$Age)
+barplot(totAge, main= "total age counts", xlab = "age group", col = "green")
+```
+
+
+```{r}
+age_counts <- table(dfNS$Neighbourhood)
+barplot(age_counts, main="Total Patients by Neighborhood",xlab="neighborhood", col = "light blue")
+```
+
+
+```{r}
+age_counts <- table(dfNS_Yes$Neighbourhood)
+barplot(age_counts, main="Total Neighborhood Counts",xlab="neighborhood", col = "light blue")
+```
+
+
+
+
+
+
+Linear Regression
+
+```{r}
+lmModel<- lm(formula = No.show ~.,data=dfNS)
+summary(fawn.lm)
+```
+
+
+
+
+
+
+
+
+
+
+K-means Analysis
+
+Spliting the data into two data frames based on if the patient showed up to their appointment or not
+
+
+```{r}
+str(df)
+
+dfK<-df[,-1:-2]
+str(dfK)
+
+dfK$ScheduledDay<-as.Date(dfK$ScheduledDay)
+dfK$AppointmentDay<-as.Date(dfK$AppointmentDay)
+dfK$Total_Days<- difftime(dfK$AppointmentDay,dfK$ScheduledDay, units = "days")
+
+dfK<-dfK[,-1:-3] 
+dfK<-dfK[,-2]
+ 
+dfK$Scholarship<- as.numeric(dfK$Scholarship)
+dfK$Hipertension<- as.numeric(dfK$Hipertension)
+dfK$Diabetes<- as.numeric(dfK$Diabetes)
+dfK$Alcoholism<- as.numeric(dfK$Alcoholism)
+dfK$Handcap<- as.numeric(dfK$Handcap)
+dfK$SMS_received<- as.numeric(dfK$SMS_received)
+dfK$Age<- as.numeric(dfK$Age)
+dfK$Total_Days<-as.numeric(dfK$Total_Days)
+dfK$No.show<-as.numeric(dfK$No.show)
+scaled_dfK<- as.matrix(scale(dfK))
+dfk2<-dfK[,-1]
+scaled_dfk2<-as.matrix(scale(dfk2))
+
+
+noShows<- subset.data.frame(dfK, No.show=="Yes", select=c(No.show, Scholarship, Hipertension, Diabetes, Alcoholism, Handcap, SMS_received, Age, Total_Days))
+ShowedUp<- subset.data.frame(dfK, No.show == "No", select=c(No.show, Scholarship, Hipertension, Diabetes, Alcoholism, Handcap, SMS_received, Age, Total_Days))
+
+View(noShows)
+str(noShows)
+noShows$Scholarship<- as.numeric(noShows$Scholarship)
+noShows$Hipertension<- as.numeric(noShows$Hipertension)
+noShows$Diabetes<- as.numeric(noShows$Diabetes)
+noShows$Alcoholism<- as.numeric(noShows$Alcoholism)
+noShows$Handcap<- as.numeric(noShows$Handcap)
+noShows$SMS_received<- as.numeric(noShows$SMS_received)
+noShows$Age<- as.numeric(noShows$Age)
+noShows$Total_Days<-as.numeric(noShows$Total_Days)
+noShows<-noShows[,-1]
+scaled_noShows<- as.matrix(scale(noShows))
+
+View(ShowedUp)
+str(ShowedUp)
+ShowedUp$Scholarship<- as.numeric(ShowedUp$Scholarship)
+ShowedUp$Hipertension<- as.numeric(ShowedUp$Hipertension)
+ShowedUp$Diabetes<- as.numeric(ShowedUp$Diabetes)
+ShowedUp$Alcoholism<- as.numeric(ShowedUp$Alcoholism)
+ShowedUp$Handcap<- as.numeric(ShowedUp$Handcap)
+ShowedUp$SMS_received<- as.numeric(ShowedUp$SMS_received)
+ShowedUp$Age<- as.numeric(ShowedUp$Age)
+ShowedUp$Total_Days<-as.numeric(ShowedUp$Total_Days)
+ShowedUp<-ShowedUp[,-1]
+scaled_ShowedUp<- as.matrix(scale(ShowedUp))
+```
+
+
+In order to know the optimal number of clusters in Kmeans analysis, an elbow plot will be created using set.seed(123) to choose numbers at random. Once the optimal number of clusters has been chosen, kmeans analysis will be performed. 
+
+```{r}
+set.seed(123)
+wss<-function(k){
+  return(kmeans(scaled_dfk2, k, nstart = 25)$tot.withinss)
+}
+k_values<-1:5 
+wss_values<- purrr::map_dbl(k_values, wss)
+
+plot(x=k_values, y=wss_values, type = "b", frame = F, xlab = "Number of Clusters K", ylab = "Total Within-Clusters SUM of Squares")
+
+```
+
+
+```{r}
+result_dfK2<-kmeans(scaled_dfk2, centers=3, nstart= 25, iter.max = 100, algorithm = "Hartigan-Wong")
+result_dfK2
+fviz_cluster(result_dfK2, data = scaled_dfk2)
+
+```
+
+
+```{r}
+noShowclust <- eclust(scaled_noShows, "kmeans", nstart = 1)
+```
+
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
