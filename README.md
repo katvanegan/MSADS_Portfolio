@@ -20,7 +20,7 @@ Project_Report
 
 Projects:
 
-Data_Analysis_Medical_Wait_Times
+Predicting_No_Shows_at_Doctors_Office
 
 Data_Visualization_OSHA_Amputations
 
