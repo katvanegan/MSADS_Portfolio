@@ -20,6 +20,8 @@ Project_Report
 
 Projects:
 
+Murder_Statistics_Motive
+
 Predicting_No_Shows_at_Doctors_Office
 
 Data_Visualization_OSHA_Amputations
@@ -27,6 +29,8 @@ Data_Visualization_OSHA_Amputations
 Topic_Prediction_Vaccine_Stance_NLP
 
 Project Codes:
+
+Murder_Statistics_Motive
 
 Predicting_No_Shows_at_Doctors_Office
 
